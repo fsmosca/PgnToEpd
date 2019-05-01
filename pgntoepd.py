@@ -8,18 +8,18 @@ import PySimpleGUI as sg
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.0'
+APP_VERSION = 'v0.1.1'
 
 
 def main():
     layout = [
             [sg.Text('Input PGN', size = (10, 1)), 
-               sg.InputText('', size = (56, 1), key = '_txt_pgn_'),
+               sg.InputText('', size = (61, 1), key = '_txt_pgn_'),
                sg.FileBrowse('Get PGN', key = '_get_pgn_')],
     
             [sg.Text('Output EPD', size = (10, 1)), 
-               sg.InputText('', size = (56, 1), key = '_txt_epd_'),
-               sg.Button('Save EPD', key='_btn_epd_')],
+               sg.InputText('', size = (61, 1), key = '_epd_file_'),
+               sg.Button('Save EPD', key = '_save_epd_')],
               
             [sg.Frame(layout=[
                 [sg.Text('Append move as', size = (12, 1)),
@@ -27,21 +27,21 @@ def main():
                  sg.Radio('sm', 'first_color', size=(8, 1), key = '_sm_'),
                  sg.Radio('pm', 'first_color', size=(8, 1), key = '_pm_'),
                  sg.Radio('am', 'first_color', size=(8, 1), key = '_am_'),
-                 sg.Radio('Never', 'first_color', size=(16, 1), key = '_nomove_', default=True)],
+                 sg.Radio('Never', 'first_color', size=(8, 1), key = '_nomove_', default=True)],
                  
                 [sg.Text('Append id from', size = (12, 1), tooltip='Append id from Game header tags'),
                  sg.Radio('White', 'epd_id', size=(8, 1), key = '_wepdid_',), 
                  sg.Radio('Black', 'epd_id', size=(8, 1), key = '_bepdid_'),
                  sg.Radio('Event', 'epd_id', size=(8, 1), key = '_eventepdid_'),
-                 sg.Radio('Never', 'epd_id', size=(16, 1), key = '_neverid_', default=True)],
+                 sg.Radio('Never', 'epd_id', size=(8, 1), key = '_neverid_', default=True)],
                  
                 [sg.Text('EPD duplicates', size = (12, 1)),
                  sg.Radio('Remove', 'duplicates', size=(8, 1), key = '_removedupes_', default=True), 
                  sg.Radio('Never', 'duplicates', size=(24, 1), key = '_donotremovedupes_')],
                 
                 [sg.Text('Side to move', size = (12, 1)),
-                 sg.CBox('White', key = '_cb_white_'), 
-                 sg.CBox('Black', key = '_cb_black_')],
+                 sg.CBox('White', key = '_cb_white_', default=True), 
+                 sg.CBox('Black', key = '_cb_black_', default=True)],
                  
                 [sg.Text('Move no.', size = (12, 1)),
                  sg.Text('Minimum', size = (8, 1)),
@@ -67,7 +67,7 @@ def main():
                  sg.InputText('25', size = (6, 1), key = '_cp_min_'), 
                  sg.Text('Maximum', size = (8, 1)),
                  sg.InputText('50', size = (6, 1), key = '_cp_max_')],
-                ], title='Analysis', title_color='blue', visible=True)
+                ], title='Analysis', title_color='blue', visible=False)
             ],
             
             [sg.OK(key = '_process_pgn_'), sg.Cancel(key = '_cancel_')]
@@ -83,6 +83,20 @@ def main():
         
         if button is None or button == 'Exit':
             break
+        
+        if button == '_cancel_':
+            break
+        
+        if button == '_save_epd_':
+            epd_path = sg.PopupGetFile('Input epd file or click save as to locate the file', title='PGN to EPD', save_as=True)
+            if epd_path is None:
+                continue
+            while True:
+                button, value = window.Read(timeout=0)
+                window.FindElement('_epd_file_').Update(epd_path)
+                break
+#            with open(epd_path, mode= 'a+', encoding='utf-8') as f:
+#                f.write('my epd\n')
         
         if button == '_get_pgn_':
             layout1 = [
