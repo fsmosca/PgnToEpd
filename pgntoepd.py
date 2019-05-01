@@ -1,16 +1,21 @@
 # -*- coding: utf-8 -*-
 """
+pgntoepd.py
 
 """
 
 import PySimpleGUI as sg
 
 
+APP_NAME = 'PGN to EPD'
+APP_VERSION = 'v0.1.0'
+
+
 def main():
     layout = [
             [sg.Text('Input PGN', size = (10, 1)), 
                sg.InputText('', size = (56, 1), key = '_txt_pgn_'),
-               sg.Button('Get PGN', key='_get_pgn_')],
+               sg.FileBrowse('Get PGN', key = '_get_pgn_')],
     
             [sg.Text('Output EPD', size = (10, 1)), 
                sg.InputText('', size = (56, 1), key = '_txt_epd_'),
@@ -24,7 +29,7 @@ def main():
                  sg.Radio('am', 'first_color', size=(8, 1), key = '_am_'),
                  sg.Radio('Never', 'first_color', size=(16, 1), key = '_nomove_', default=True)],
                  
-                [sg.Text('Append id from', size = (12, 1)),
+                [sg.Text('Append id from', size = (12, 1), tooltip='Append id from Game header tags'),
                  sg.Radio('White', 'epd_id', size=(8, 1), key = '_wepdid_',), 
                  sg.Radio('Black', 'epd_id', size=(8, 1), key = '_bepdid_'),
                  sg.Radio('Event', 'epd_id', size=(8, 1), key = '_eventepdid_'),
@@ -62,13 +67,13 @@ def main():
                  sg.InputText('25', size = (6, 1), key = '_cp_min_'), 
                  sg.Text('Maximum', size = (8, 1)),
                  sg.InputText('50', size = (6, 1), key = '_cp_max_')],
-                ], title='Analysis', title_color='blue')
+                ], title='Analysis', title_color='blue', visible=True)
             ],
             
-            [sg.B('OK', key=('_OK_RUN'))]
+            [sg.OK(key = '_process_pgn_'), sg.Cancel(key = '_cancel_')]
     ]
     
-    window = sg.Window('PGN to EPD', layout,
+    window = sg.Window('{} {}'.format(APP_NAME, APP_VERSION), layout,
                        default_button_element_size=(12, 1),
                        auto_size_buttons=False,
                        icon='')
