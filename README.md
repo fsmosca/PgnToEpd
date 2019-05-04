@@ -3,7 +3,16 @@ A program written in python that converts positions in the games from PGN file t
 
 ![](https://i.imgur.com/AD989z4.png)
 
-### Credits
+### A. Requirements
+* Python 3
+* Python-Chess
+
+#### A.1 Installation
+* Downloard and install Python 3 at https://www.python.org/downloads/
+* Install Python-chess with the following command line<br>
+`pip install python-chess`
+
+### B. Credits
 * PySimpleGUI<br>
 https://github.com/PySimpleGUI/PySimpleGUI
 
