@@ -19,7 +19,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.2'
+APP_VERSION = 'v0.1.3'
 
 
 def delete_file(fn):
@@ -42,6 +42,7 @@ class pgn_to_epd(threading.Thread):
         self.max_move_number = max_move_number
         self.output_epdfn = output_epdfn
         self.num_games = self.get_num_games()
+        self.num_processed_games = 0
 
     def get_num_games(self):
         num_games = 0
@@ -55,7 +56,7 @@ class pgn_to_epd(threading.Thread):
     def run(self):
         with open(self.pgnfn, mode = 'r', encoding = 'utf-8') as h:
             game = chess.pgn.read_game(h)
-            game_cnt = 0
+            self.num_processed_games = 0
     
             # Loop thru the games
             while game: 
@@ -64,9 +65,9 @@ class pgn_to_epd(threading.Thread):
                 event_tag = game.headers['Event']
                 
                 game_node = game
-                game_cnt += 1
-                self.pgntoepd_queue.put('processing game {} of {} or ({:0.1f}%)'.format(game_cnt, 
-                                        self.num_games, 100*game_cnt/self.num_games))
+                self.num_processed_games += 1
+                self.pgntoepd_queue.put('processing game {} of {} or ({:0.1f}%)'.format(self.num_processed_games, 
+                    self.num_games, 100*self.num_processed_games/self.num_games))
         
                 # Loop thru the moves
                 while game_node.variations:
@@ -197,7 +198,6 @@ def main():
         button, value = window.Read(timeout=10)
         
         if button is None or button == 'Exit':
-            print('button: {}'.format(button))
             logging.info('x is pressed')
             break
         
@@ -262,9 +262,15 @@ def main():
             window.FindElement('_status_').Update('Status: processing ...')            
             pgntoepd = pgn_to_epd(gui_que, pgnfn, save_epdfn, append_move_type, append_tag, is_remove_duplicate,
                                   color_to_move, min_move_number, max_move_number)
+            pgntoepd.setDaemon(True)
             pgntoepd.start()
             while True:
                 button, value = window.Read(timeout=1000)
+                
+                if button is None:
+                    logging.info('x is pressed')
+                    sys.exit()
+                    
                 msg = gui_que.get()
                 window.FindElement('_status_').Update('Status: {}'.format(msg))
                 if 'done' in msg:
