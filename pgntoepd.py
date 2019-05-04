@@ -19,7 +19,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.4'
+APP_VERSION = 'v0.1.5'
 
 
 def delete_file(fn):
@@ -148,14 +148,15 @@ def main():
     gui_que = queue.Queue()
     sg.ChangeLookAndFeel('Reddit')
     layout = [
-            [sg.Text('Input PGN', size = (12, 1)), 
-               sg.InputText('', size = (59, 1), key = '_txt_pgn_'),
+            [sg.Text('Input PGN', size = (10, 1)), 
+               sg.InputText('', size = (61, 1), key = '_txt_pgn_'),
                sg.FileBrowse('Get PGN', key = '_get_pgn_', file_types=(("PGN Files", "*.pgn"), ("All Files", "*.*"),))],
     
-            [sg.Text('Output EPD', size = (12, 1)), 
-               sg.InputText('', size = (59, 1), key = '_epd_file_'),
+            [sg.Text('Output EPD', size = (10, 1)), 
+               sg.InputText('', size = (61, 1), key = '_epd_file_'),
                sg.Button('Save EPD', key = '_save_epd_')],
-            [sg.Text('EPD write mode', size = (12, 1)),
+             
+            [sg.Text('EPD write mode', size = (14, 1)),
                sg.Radio('append', 'write_mode', size=(8, 1), key = '_write_append_', default=True), 
                sg.Radio('overwrite', 'write_mode', size=(8, 1), key = '_write_overwrite_')],
               
@@ -178,7 +179,7 @@ def main():
                  sg.Radio('Never', 'duplicate', size=(24, 1), key = '_never_remove_duplicate_')],
                 
                 [sg.Text('Side to move', size = (12, 1)),
-                 sg.CBox('White', key = '_white_side_to_move_', default=True), 
+                 sg.CBox('White', key = '_white_side_to_move_', size = (8, 1), default=True), 
                  sg.CBox('Black', key = '_black_side_to_move_', default=True)],
                  
                 [sg.Text('Move no.', size = (12, 1)),
