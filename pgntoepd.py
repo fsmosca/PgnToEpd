@@ -19,7 +19,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.3'
+APP_VERSION = 'v0.1.4'
 
 
 def delete_file(fn):
@@ -30,7 +30,7 @@ def delete_file(fn):
 
 class pgn_to_epd(threading.Thread):
     def __init__(self, pgntoepd_queue, pgnfn, output_epdfn, append_move, append_id, remove_duplicate,
-                 side_to_move, min_move_number, max_move_number):
+                 side_to_move, min_move_number, max_move_number, write_append):
         threading.Thread.__init__(self)
         self.pgntoepd_queue = pgntoepd_queue
         self.pgnfn = pgnfn
@@ -42,6 +42,7 @@ class pgn_to_epd(threading.Thread):
         self.max_move_number = max_move_number
         self.output_epdfn = output_epdfn
         self.num_games = self.get_num_games()
+        self.write_append = write_append
         self.num_processed_games = 0
 
     def get_num_games(self):
@@ -54,6 +55,10 @@ class pgn_to_epd(threading.Thread):
         return num_games
         
     def run(self):
+        if not self.write_append:
+            delete_file(self.output_epdfn)
+            
+        # Process PGN file
         with open(self.pgnfn, mode = 'r', encoding = 'utf-8') as h:
             game = chess.pgn.read_game(h)
             self.num_processed_games = 0
@@ -75,6 +80,7 @@ class pgn_to_epd(threading.Thread):
                     epd = game_node.board().epd()
                     
                     fmvn = game_node.board().fullmove_number
+                    hmvc = game_node.board().halfmove_number
                     next_node = game_node.variation(0)
                     san_move = next_node.san()
                     
@@ -107,16 +113,29 @@ class pgn_to_epd(threading.Thread):
                         epd_id = event_tag                        
 
                     with open(self.output_epdfn, mode = 'a+', encoding = 'utf-8') as f:
-                        if self.append_id == 'never':
-                            if self.append_move == 'never':
-                                f.write('{}\n'.format(epd))
+                        if hmvc >= 80:
+                            if self.append_id == 'never':
+                                if self.append_move == 'never':
+                                    f.write('{} hmvc {};\n'.format(epd, hmvc))
+                                else:
+                                    f.write('{} {} {}; hmvc {};\n'.format(epd, self.append_move, san_move, hmvc))
                             else:
-                                f.write('{} {} {};\n'.format(epd, self.append_move, san_move))
+                                if self.append_move == 'never':
+                                    f.write('{} hmvc {}; id \"{}\";\n'.format(epd, hmvc, epd_id))
+                                else:
+                                    f.write('{} {} {}; hmvc {}; id \"{}\";\n'.format(epd, 
+                                            self.append_move, san_move, hmvc, epd_id))
                         else:
-                            if self.append_move == 'never':
-                                f.write('{} id \"{}\";\n'.format(epd, epd_id))
+                            if self.append_id == 'never':
+                                if self.append_move == 'never':
+                                    f.write('{}\n'.format(epd))
+                                else:
+                                    f.write('{} {} {};\n'.format(epd, self.append_move, san_move))
                             else:
-                                f.write('{} {} {}; id \"{}\";\n'.format(epd, self.append_move, san_move, epd_id))                                
+                                if self.append_move == 'never':
+                                    f.write('{} id \"{}\";\n'.format(epd, epd_id))
+                                else:
+                                    f.write('{} {} {}; id \"{}\";\n'.format(epd, self.append_move, san_move, epd_id))
 
                     game_node = next_node
         
@@ -129,13 +148,16 @@ def main():
     gui_que = queue.Queue()
     sg.ChangeLookAndFeel('Reddit')
     layout = [
-            [sg.Text('Input PGN', size = (10, 1)), 
-               sg.InputText('', size = (61, 1), key = '_txt_pgn_'),
+            [sg.Text('Input PGN', size = (12, 1)), 
+               sg.InputText('', size = (59, 1), key = '_txt_pgn_'),
                sg.FileBrowse('Get PGN', key = '_get_pgn_', file_types=(("PGN Files", "*.pgn"), ("All Files", "*.*"),))],
     
-            [sg.Text('Output EPD', size = (10, 1)), 
-               sg.InputText('', size = (61, 1), key = '_epd_file_'),
+            [sg.Text('Output EPD', size = (12, 1)), 
+               sg.InputText('', size = (59, 1), key = '_epd_file_'),
                sg.Button('Save EPD', key = '_save_epd_')],
+            [sg.Text('EPD write mode', size = (12, 1)),
+               sg.Radio('append', 'write_mode', size=(8, 1), key = '_write_append_', default=True), 
+               sg.Radio('overwrite', 'write_mode', size=(8, 1), key = '_write_overwrite_')],
               
             [sg.Frame(layout=[                 
                 [sg.Text('Append move as', size = (12, 1)),
@@ -205,6 +227,9 @@ def main():
             save_epdfn = value['_epd_file_']
             pgnfn = value['_txt_pgn_']
             
+            # Radio, write mode
+            is_write_append = value['_write_append_']
+            
             # Radio
             is_bm_append_move = value['_bm_']
             is_sm_append_move = value['_sm_']
@@ -261,7 +286,7 @@ def main():
             
             window.FindElement('_status_').Update('Status: processing ...')            
             pgntoepd = pgn_to_epd(gui_que, pgnfn, save_epdfn, append_move_type, append_tag, is_remove_duplicate,
-                                  color_to_move, min_move_number, max_move_number)
+                                  color_to_move, min_move_number, max_move_number, is_write_append)
             pgntoepd.setDaemon(True)
             pgntoepd.start()
             while True:
