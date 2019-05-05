@@ -8,6 +8,7 @@ import PySimpleGUI as sg
 import sys
 import os
 import threading
+import time
 import queue
 import chess
 import chess.pgn
@@ -19,7 +20,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.5'
+APP_VERSION = 'v0.1.6.beta'
 
 
 def delete_file(fn):
@@ -44,19 +45,32 @@ class pgn_to_epd(threading.Thread):
         self.num_games = self.get_num_games()
         self.write_append = write_append
         self.num_processed_games = 0
+        self.tmp_save = []
 
     def get_num_games(self):
         num_games = 0
-        with open(self.pgnfn, 'r') as f:
+        with open(self.pgnfn, mode = 'r', encoding = 'utf-8') as f:
             for lines in f:
                 if '[Result ' in lines:
                     num_games += 1
                     
         return num_games
+    
+    def get_existing_epd(self):
+        if os.path.isfile(self.output_epdfn):
+            with open(self.output_epdfn, mode = 'r', encoding = 'utf-8') as f:
+                for lines in f:
+                    line = lines.strip()
+                    self.tmp_save.append(line)
         
     def run(self):
+        # If epd writing is overwrite mode
         if not self.write_append:
+            logging.info('overwrite mode, delete file {}'.format(self.output_epdfn))
             delete_file(self.output_epdfn)
+        else:
+            logging.info('append mode, save existing epd lines')
+            self.get_existing_epd()
             
         # Process PGN file
         with open(self.pgnfn, mode = 'r', encoding = 'utf-8') as h:
@@ -80,7 +94,7 @@ class pgn_to_epd(threading.Thread):
                     epd = game_node.board().epd()
                     
                     fmvn = game_node.board().fullmove_number
-                    hmvc = game_node.board().halfmove_number
+                    hmvc = game_node.board().halfmove_clock
                     next_node = game_node.variation(0)
                     san_move = next_node.san()
                     
@@ -113,29 +127,79 @@ class pgn_to_epd(threading.Thread):
                         epd_id = event_tag                        
 
                     with open(self.output_epdfn, mode = 'a+', encoding = 'utf-8') as f:
+                        # Writing hmvc or fifty-move number is not part of the options.
+                        # But with high hmvc we record this number as it may affect the evaluation of the position.
                         if hmvc >= 80:
                             if self.append_id == 'never':
                                 if self.append_move == 'never':
-                                    f.write('{} hmvc {};\n'.format(epd, hmvc))
+                                    unique_epd = epd
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{} hmvc {};\n'.format(epd, hmvc))
+                                            self.tmp_save.append(unique_epd)
+                                    else:
+                                        f.write('{} hmvc {};\n'.format(epd, hmvc))
                                 else:
-                                    f.write('{} {} {}; hmvc {};\n'.format(epd, self.append_move, san_move, hmvc))
+                                    unique_epd = '{} {} {};'.format(epd, self.append_move, san_move)
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{} {} {}; hmvc {};\n'.format(epd, self.append_move, san_move, hmvc))
+                                            self.tmp_save.append(unique_epd)
+                                    else:
+                                        f.write('{} {} {}; hmvc {};\n'.format(epd, self.append_move, san_move, hmvc))
                             else:
                                 if self.append_move == 'never':
-                                    f.write('{} hmvc {}; id \"{}\";\n'.format(epd, hmvc, epd_id))
+                                    unique_epd = '{}'.format(epd)
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{} hmvc {}; id \"{}\";\n'.format(epd, hmvc, epd_id))
+                                            self.tmp_save.append(unique_epd)
+                                        else:
+                                            f.write('{} hmvc {}; id \"{}\";\n'.format(epd, hmvc, epd_id))
                                 else:
-                                    f.write('{} {} {}; hmvc {}; id \"{}\";\n'.format(epd, 
-                                            self.append_move, san_move, hmvc, epd_id))
+                                    unique_epd = '{} {} {};'.format(epd, self.append_move, san_move)
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{} {} {}; hmvc {}; id \"{}\";\n'.format(epd, self.append_move, san_move, hmvc, epd_id))
+                                            self.tmp_save.append(unique_epd)
+                                    else:
+                                        f.write('{} {} {}; hmvc {}; id \"{}\";\n'.format(epd, self.append_move, san_move, hmvc, epd_id))
+                        # Else if hmvc is below 80
                         else:
                             if self.append_id == 'never':
                                 if self.append_move == 'never':
-                                    f.write('{}\n'.format(epd))
+                                    unique_epd = '{}'.format(epd)
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{}\n'.format(epd))
+                                            self.tmp_save.append(unique_epd)
+                                    else:
+                                        f.write('{}\n'.format(epd))
                                 else:
-                                    f.write('{} {} {};\n'.format(epd, self.append_move, san_move))
+                                    unique_epd = '{} {} {};'.format(epd, self.append_move, san_move)
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{} {} {};\n'.format(epd, self.append_move, san_move))
+                                            self.tmp_save.append(unique_epd)
+                                    else:
+                                        f.write('{} {} {};\n'.format(epd, self.append_move, san_move))
                             else:
                                 if self.append_move == 'never':
-                                    f.write('{} id \"{}\";\n'.format(epd, epd_id))
+                                    unique_epd = '{}'.format(epd)
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{} id \"{}\";\n'.format(epd, epd_id))
+                                            self.tmp_save.append(unique_epd)
+                                    else:
+                                        f.write('{} id \"{}\";\n'.format(epd, epd_id))
                                 else:
-                                    f.write('{} {} {}; id \"{}\";\n'.format(epd, self.append_move, san_move, epd_id))
+                                    unique_epd = '{} {} {};'.format(epd, self.append_move, san_move)
+                                    if self.remove_duplicate:
+                                        if not unique_epd in self.tmp_save:
+                                            f.write('{} {} {}; id \"{}\";\n'.format(epd, self.append_move, san_move, epd_id))
+                                            self.tmp_save.append(unique_epd)
+                                    else:
+                                        f.write('{} {} {}; id \"{}\";\n'.format(epd, self.append_move, san_move, epd_id))
 
                     game_node = next_node
         
@@ -145,7 +209,7 @@ class pgn_to_epd(threading.Thread):
         
 
 def main():
-    gui_que = queue.Queue()
+    gui_queue = queue.Queue()
     sg.ChangeLookAndFeel('Reddit')
     layout = [
             [sg.Text('Input PGN', size = (10, 1)), 
@@ -209,7 +273,7 @@ def main():
                 ], title='Analysis', title_color='blue', visible=False)
             ],
             
-            [sg.OK(key = '_pgn_to_epd_'), sg.Text('Status: waiting', size = (44, 1), key = '_status_')]
+            [sg.OK(key = '_pgn_to_epd_'), sg.Text('Status: waiting', size = (64, 1), key = '_status_')]
     ]
     
     window = sg.Window('{} {}'.format(APP_NAME, APP_VERSION), layout,
@@ -285,8 +349,10 @@ def main():
             min_move_number = int(value['_min_move_number_'])
             max_move_number = int(value['_max_move_number_'])
             
+            t1 = time.time()
+            
             window.FindElement('_status_').Update('Status: processing ...')            
-            pgntoepd = pgn_to_epd(gui_que, pgnfn, save_epdfn, append_move_type, append_tag, is_remove_duplicate,
+            pgntoepd = pgn_to_epd(gui_queue, pgnfn, save_epdfn, append_move_type, append_tag, is_remove_duplicate,
                                   color_to_move, min_move_number, max_move_number, is_write_append)
             pgntoepd.setDaemon(True)
             pgntoepd.start()
@@ -297,16 +363,17 @@ def main():
                     logging.info('x is pressed')
                     sys.exit()
                     
-                msg = gui_que.get()
+                msg = gui_queue.get()
                 window.FindElement('_status_').Update('Status: {}'.format(msg))
                 if 'done' in msg:
                     break
             pgntoepd.join()
-            window.FindElement('_status_').Update('Status: waiting')
+            elapsed = time.time() - t1
+            window.FindElement('_status_').Update('Current Status: waiting, Previous Status: Done!!, elapsed: {:0.2f}s'.format(elapsed))
         
         if button == '_save_epd_':
             epd_path = sg.PopupGetFile('Input epd file or click save as to locate the file', 
-                    file_types=(("EPD Files", "*.epd"), ("All Files", "*.*"),), title='PGN to EPD', save_as=False)
+                    file_types=(("EPD Files", "*.epd"), ("All Files", "*.*"),), title='PGN to EPD', save_as=True)
             try:
                 while True:
                     button, value = window.Read(timeout=0)
