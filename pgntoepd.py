@@ -20,7 +20,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.11.beta'
+APP_VERSION = 'v0.1.12.beta'
 BOX_TITLE = APP_NAME + ' ' + APP_VERSION
 
 
@@ -33,7 +33,7 @@ def delete_file(fn):
 class pgn_to_epd(threading.Thread):
     def __init__(self, pgntoepd_queue, pgnfn, output_epdfn, append_move,
                  append_id, remove_duplicate, side_to_move, min_move_number,
-                 max_move_number, write_append):
+                 max_move_number, write_append, is_first_move):
         threading.Thread.__init__(self)
         self.pgntoepd_queue = pgntoepd_queue
         self.pgnfn = pgnfn
@@ -45,6 +45,8 @@ class pgn_to_epd(threading.Thread):
         self.max_move_number = max_move_number
         self.output_epdfn = output_epdfn
         self.write_append = write_append
+        self.is_first_move = is_first_move
+        self.move_sequence = 0
         self.num_processed_games = 0
         self.tmp_save = []
         self.file_encoding = None
@@ -113,6 +115,7 @@ class pgn_to_epd(threading.Thread):
     
             # Loop thru the games
             while game: 
+                self.move_sequence = 0
                 white_tag = game.headers['White']
                 black_tag = game.headers['Black']
                 event_tag = game.headers['Event']
@@ -134,6 +137,15 @@ class pgn_to_epd(threading.Thread):
                     san_move = next_node.san()
                     nags = next_node.nags
                     
+                    # Count of read moves for every game. This is useful for
+                    # "First move only" option
+                    self.move_sequence += 1
+                    
+                    # If first move option is true and this is the second move,
+                    # we skip the rest of the moves and read the next game instead.
+                    if self.move_sequence > 1 and self.is_first_move:
+                        break
+                    
                     # If move with ? or ?? is set
                     if self.append_move == 'am_bad':
                         if chess.pgn.NAG_MISTAKE in nags or chess.pgn.NAG_BLUNDER in nags:
@@ -142,18 +154,20 @@ class pgn_to_epd(threading.Thread):
                             move_append = 'never'
                     else:
                         move_append = self.append_move
-                    
-                    # Move number filter
-                    if fmvn > self.max_move_number:
-                        logging.info('fmvn {} is more than max move number {}, break'.format(fmvn,
-                                     self.max_move_number))
-                        break
-                    
-                    if fmvn < self.min_move_number:
-                        game_node = next_node
-                        logging.info('fmvn {} is less than min move number {}, continue'.format(fmvn,
-                                     self.min_move_number))
-                        continue
+                        
+                    # Ignore min and max move no. options when "First move only" option is true.
+                    if not self.is_first_move:             
+                        # Move number filter
+                        if fmvn > self.max_move_number:
+                            logging.info('fmvn {} is more than max move number {}, break'.format(fmvn,
+                                         self.max_move_number))
+                            break
+                        
+                        if fmvn < self.min_move_number:
+                            game_node = next_node
+                            logging.info('fmvn {} is less than min move number {}, continue'.format(fmvn,
+                                         self.min_move_number))
+                            continue                     
                     
                     # Side to move filter
                     if self.side_to_move == 'w' and not side:
@@ -309,10 +323,12 @@ def main():
                  sg.CBox('Black', key = '_black_side_to_move_', default=True)],
                  
                 [sg.Text('Move no.', size = (12, 1)),
-                 sg.Text('Minimum', size = (8, 1)),
-                 sg.InputText('1', size = (6, 1), key = '_min_move_number_'), 
+                 sg.Text('Minimum', size = (10, 1)),
+                 sg.InputText('1', size = (8, 1), key = '_min_move_number_'), 
                  sg.Text('Maximum', size = (8, 1)),
-                 sg.InputText('40', size = (6, 1), key = '_max_move_number_')],
+                 sg.InputText('40', size = (8, 1), key = '_max_move_number_'),
+                 sg.CBox('First move only', key = '_first_move_', size = (16, 1),
+                         tooltip = 'If set to true, min and max move no. are ignored', default=False)],
                 ], title='Options', title_color='red')
             ],
             
@@ -415,6 +431,8 @@ def main():
             min_move_number = int(value['_min_move_number_'])
             max_move_number = int(value['_max_move_number_'])
             
+            is_first_move = True if value['_first_move_'] else False
+            
             t1 = time.time()
             
             # Make sure that pgn input box is not empty
@@ -431,8 +449,8 @@ def main():
             
             window.FindElement('_status_').Update('Status: processing ...')            
             pgntoepd = pgn_to_epd(gui_queue, pgnfn, save_epdfn, append_move_type,
-                    append_tag, is_remove_duplicate, color_to_move,
-                    min_move_number, max_move_number, is_write_append)
+                    append_tag, is_remove_duplicate, color_to_move, min_move_number, 
+                    max_move_number, is_write_append, is_first_move)
             pgntoepd.setDaemon(True)
             pgntoepd.start()
             while True:
