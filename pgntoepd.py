@@ -20,7 +20,8 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.10.beta'
+APP_VERSION = 'v0.1.11.beta'
+BOX_TITLE = APP_NAME + ' ' + APP_VERSION
 
 
 def delete_file(fn):
@@ -416,9 +417,16 @@ def main():
             
             t1 = time.time()
             
+            # Make sure that pgn input box is not empty
+            if pgnfn == '':
+                logging.warning('Input pgn file is missing.')
+                sg.PopupOK('Input PGN file is missing! Please press the Get PGN button.', title = BOX_TITLE)
+                continue
+            
             # Make sure that epd output box is not empty
             if save_epdfn == '':
-                logging.warning('output epd file is missing.')
+                logging.warning('Output epd file is missing.')
+                sg.PopupOK('Output EPD file is missing! Please press the Save EPD button.', title = BOX_TITLE)
                 continue
             
             window.FindElement('_status_').Update('Status: processing ...')            
