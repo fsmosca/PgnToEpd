@@ -20,7 +20,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.6.beta'
+APP_VERSION = 'v0.1.8.beta'
 
 
 def delete_file(fn):
@@ -42,28 +42,60 @@ class pgn_to_epd(threading.Thread):
         self.min_move_number = min_move_number
         self.max_move_number = max_move_number
         self.output_epdfn = output_epdfn
-        self.num_games = self.get_num_games()
         self.write_append = write_append
         self.num_processed_games = 0
         self.tmp_save = []
+        self.file_encoding = None
+        self.num_games = self.get_num_games()
 
     def get_num_games(self):
+        """
+        This method is called the moment class pgn_to_epd is used.
+        This method also changes the encoding from None to utf-8, if None
+        will not work. If utf-8 also will not work, we will quit the program
+        and log some warning messages.
+        """
         num_games = 0
-        with open(self.pgnfn, mode = 'r', encoding = 'utf-8') as f:
-            for lines in f:
-                if '[Result ' in lines:
-                    num_games += 1
+        
+        try:
+            with open(self.pgnfn, mode = 'r', encoding = self.file_encoding) as f:
+                for lines in f:
+                    if '[Result ' in lines:
+                        num_games += 1
+        except Exception as ex:
+            template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+            message = template.format(type(ex).__name__, ex.args)
+            logging.warning(message)
+            
+            # Change encoding and try again
+            if self.file_encoding is None:
+                self.file_encoding = 'utf-8'
+            else:
+                self.file_encoding = None
+                
+            logging.info('Try using encoding: {}'.format(self.file_encoding))
+            
+            try:
+                with open(self.pgnfn, mode = 'r', encoding = self.file_encoding) as f:
+                    for lines in f:
+                        if '[Result ' in lines:
+                            num_games += 1
+            except Exception as ex:
+                template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+                message = template.format(type(ex).__name__, ex.args)
+                logging.warning(message)
+                sys.exit(1)
                     
         return num_games
     
     def get_existing_epd(self):
         if os.path.isfile(self.output_epdfn):
-            with open(self.output_epdfn, mode = 'r', encoding = 'utf-8') as f:
+            with open(self.output_epdfn, mode = 'r', encoding = self.file_encoding) as f:
                 for lines in f:
                     line = lines.strip()
                     self.tmp_save.append(line)
         
-    def run(self):
+    def run(self):            
         # If epd writing is overwrite mode
         if not self.write_append:
             logging.info('overwrite mode, delete file {}'.format(self.output_epdfn))
@@ -73,7 +105,7 @@ class pgn_to_epd(threading.Thread):
             self.get_existing_epd()
             
         # Process PGN file
-        with open(self.pgnfn, mode = 'r', encoding = 'utf-8') as h:
+        with open(self.pgnfn, mode = 'r', encoding = self.file_encoding) as h:
             game = chess.pgn.read_game(h)
             self.num_processed_games = 0
     
@@ -126,7 +158,7 @@ class pgn_to_epd(threading.Thread):
                     elif self.append_id == 'e':
                         epd_id = event_tag                        
 
-                    with open(self.output_epdfn, mode = 'a+', encoding = 'utf-8') as f:
+                    with open(self.output_epdfn, mode = 'a+', encoding = self.file_encoding) as f:
                         # Writing hmvc or fifty-move number is not part of the options.
                         # But with high hmvc we record this number as it may affect the evaluation of the position.
                         if hmvc >= 80:
@@ -213,37 +245,38 @@ def main():
     sg.ChangeLookAndFeel('Reddit')
     layout = [
             [sg.Text('Input PGN', size = (10, 1)), 
-               sg.InputText('', size = (61, 1), key = '_txt_pgn_'),
+               sg.InputText('', size = (70, 1), key = '_txt_pgn_'),
                sg.FileBrowse('Get PGN', key = '_get_pgn_', file_types=(("PGN Files", "*.pgn"), ("All Files", "*.*"),))],
     
             [sg.Text('Output EPD', size = (10, 1)), 
-               sg.InputText('', size = (61, 1), key = '_epd_file_'),
+               sg.InputText('', size = (70, 1), key = '_epd_file_'),
                sg.Button('Save EPD', key = '_save_epd_')],
              
             [sg.Text('EPD write mode', size = (14, 1)),
-               sg.Radio('append', 'write_mode', size=(8, 1), key = '_write_append_', default=True), 
-               sg.Radio('overwrite', 'write_mode', size=(8, 1), key = '_write_overwrite_')],
+               sg.Radio('append', 'write_mode', size=(6, 1), key = '_write_append_', default=True), 
+               sg.Radio('overwrite', 'write_mode', size=(6, 1), key = '_write_overwrite_')],
               
             [sg.Frame(layout=[                 
                 [sg.Text('Append move as', size = (12, 1)),
-                 sg.Radio('bm', 'first_color', size=(8, 1), key = '_bm_',), 
-                 sg.Radio('sm', 'first_color', size=(8, 1), key = '_sm_'),
-                 sg.Radio('pm', 'first_color', size=(8, 1), key = '_pm_'),
-                 sg.Radio('am', 'first_color', size=(8, 1), key = '_am_'),
-                 sg.Radio('Never', 'first_color', size=(8, 1), key = '_never_move_', default=True)],
+                 sg.Radio('bm', 'first_color', size=(6, 1), key = '_bm_',), 
+                 sg.Radio('sm', 'first_color', size=(6, 1), key = '_sm_'),
+                 sg.Radio('pm', 'first_color', size=(6, 1), key = '_pm_'),
+                 sg.Radio('am', 'first_color', size=(6, 1), key = '_am_'),
+                 sg.Radio('am if move[?, ??]', 'first_color', size=(13, 1), key = '_am_q', tooltip='Not functional yet',),
+                 sg.Radio('Never', 'first_color', size=(6, 1), key = '_never_move_', default=True)],
                  
                 [sg.Text('Append id from', size = (12, 1), tooltip='Append id from Game header tags.'),
-                 sg.Radio('White', 'epd_id', size=(8, 1), key = '_white_id_',), 
-                 sg.Radio('Black', 'epd_id', size=(8, 1), key = '_black_id_'),
-                 sg.Radio('Event', 'epd_id', size=(8, 1), key = '_event_id_'),
-                 sg.Radio('Never', 'epd_id', size=(8, 1), key = '_never_id_', default=True)],
+                 sg.Radio('White', 'epd_id', size=(6, 1), key = '_white_id_',), 
+                 sg.Radio('Black', 'epd_id', size=(6, 1), key = '_black_id_'),
+                 sg.Radio('Event', 'epd_id', size=(6, 1), key = '_event_id_'),
+                 sg.Radio('Never', 'epd_id', size=(6, 1), key = '_never_id_', default=True)],
                  
                 [sg.Text('EPD duplicates', size = (12, 1)),
-                 sg.Radio('Remove', 'duplicate', size=(8, 1), key = '_remove_duplicate_', default=True), 
+                 sg.Radio('Remove', 'duplicate', size=(6, 1), key = '_remove_duplicate_', default=True), 
                  sg.Radio('Never', 'duplicate', size=(24, 1), key = '_never_remove_duplicate_')],
                 
                 [sg.Text('Side to move', size = (12, 1)),
-                 sg.CBox('White', key = '_white_side_to_move_', size = (8, 1), default=True), 
+                 sg.CBox('White', key = '_white_side_to_move_', size = (6, 1), default=True), 
                  sg.CBox('Black', key = '_black_side_to_move_', default=True)],
                  
                 [sg.Text('Move no.', size = (12, 1)),
@@ -350,6 +383,11 @@ def main():
             max_move_number = int(value['_max_move_number_'])
             
             t1 = time.time()
+            
+            # Make sure that epd output box is not empty
+            if save_epdfn == '':
+                logging.warning('output epd file is missing.')
+                continue
             
             window.FindElement('_status_').Update('Status: processing ...')            
             pgntoepd = pgn_to_epd(gui_queue, pgnfn, save_epdfn, append_move_type, append_tag, is_remove_duplicate,
