@@ -20,7 +20,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.9.beta'
+APP_VERSION = 'v0.1.10.beta'
 
 
 def delete_file(fn):
@@ -141,9 +141,6 @@ class pgn_to_epd(threading.Thread):
                             move_append = 'never'
                     else:
                         move_append = self.append_move
-                    
-                    if chess.pgn.NAG_MISTAKE in nags or chess.pgn.NAG_BLUNDER in nags:
-                        print('move {}'.format(san_move))
                     
                     # Move number filter
                     if fmvn > self.max_move_number:
