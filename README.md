@@ -1,7 +1,7 @@
 # PgnToEpd
-A program written in python that converts positions in the games from PGN file to EPD format. There are options which the user can set such as side to move, move numbers and others.
+A program written in python that converts positions in the games to EPD format. There are options which the user can set such as side to move, move numbers and others.
 
-![](https://i.imgur.com/o6jEOm4.png)
+![](https://i.imgur.com/i4cddTQ.png)
 
 ### A. Requirements
 * Python 3
