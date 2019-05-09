@@ -11,7 +11,7 @@ A program written in python that converts positions in the games to EPD format. 
 `pip install python-chess`
 
 #### A.2 Nothing
-* Just download the exe file for windows.
+* Just download the pgntoepd.exe file for windows at https://github.com/fsmosca/PgnToEpd/releases
 
 ### B. Credits
 * PySimpleGUI<br>
