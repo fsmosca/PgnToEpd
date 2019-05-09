@@ -7,6 +7,8 @@ A program written in python that converts positions in the games to EPD format. 
 #### A.1 If you use the source pgntoepd.py
 * Python 3<br>
 `Downloard and install Python 3 at https://www.python.org/downloads/`
+* PySimpleGUI<br>
+`pip install pysimplegui`
 * Python-Chess<br>
 `pip install python-chess`
 
