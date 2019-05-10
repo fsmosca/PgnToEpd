@@ -20,7 +20,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.12.beta'
+APP_VERSION = 'v0.1.13.beta'
 BOX_TITLE = APP_NAME + ' ' + APP_VERSION
 
 
@@ -33,11 +33,14 @@ def delete_file(fn):
 class pgn_to_epd(threading.Thread):
     def __init__(self, pgntoepd_queue, pgnfn, output_epdfn, append_move,
                  append_id, remove_duplicate, side_to_move, min_move_number,
-                 max_move_number, write_append, is_first_move):
+                 max_move_number, write_append, is_first_move, is_bad_move_am,
+                 is_good_move_bm):
         threading.Thread.__init__(self)
         self.pgntoepd_queue = pgntoepd_queue
         self.pgnfn = pgnfn
         self.append_move = append_move
+        self.is_bad_move_am = is_bad_move_am
+        self.is_good_move_bm = is_good_move_bm
         self.append_id = append_id
         self.remove_duplicate = remove_duplicate
         self.side_to_move = side_to_move
@@ -146,12 +149,14 @@ class pgn_to_epd(threading.Thread):
                     if self.move_sequence > 1 and self.is_first_move:
                         break
                     
-                    # If move with ? or ?? is set
-                    if self.append_move == 'am_bad':
-                        if chess.pgn.NAG_MISTAKE in nags or chess.pgn.NAG_BLUNDER in nags:
-                            move_append = 'am'
-                        else:
-                            move_append = 'never'
+                    # If move is bad and "append am if move is bad" is true
+                    if self.is_bad_move_am and (chess.pgn.NAG_MISTAKE in nags or \
+                                        chess.pgn.NAG_BLUNDER in nags):
+                        move_append = 'am'
+                    # Else if move is good and "append bm if move is good" is true
+                    elif self.is_good_move_bm and (chess.pgn.NAG_GOOD_MOVE in nags or \
+                                        chess.pgn.NAG_BRILLIANT_MOVE in nags):
+                        move_append = 'bm'
                     else:
                         move_append = self.append_move
                         
@@ -281,29 +286,34 @@ def main():
     sg.ChangeLookAndFeel('Reddit')
     layout = [
             [sg.Text('Input PGN', size = (10, 1)), 
-               sg.InputText('', size = (70, 1), key = '_txt_pgn_'),
+               sg.InputText('', size = (57, 1), key = '_txt_pgn_'),
                sg.FileBrowse('Get PGN', key = '_get_pgn_',
                   file_types=(("PGN Files", "*.pgn"), ("All Files", "*.*"),))],
     
             [sg.Text('Output EPD', size = (10, 1)), 
-               sg.InputText('', size = (70, 1), key = '_epd_file_'),
+               sg.InputText('', size = (57, 1), key = '_epd_file_'),
                sg.Button('Save EPD', key = '_save_epd_')],
              
-            [sg.Text('EPD write mode', size = (14, 1)),
-               sg.Radio('append', 'write_mode', size=(6, 1),
+            # Options
+            [sg.Frame(layout=[ 
+                [sg.Text('EPD write mode', size = (12, 1)),
+                 sg.Radio('append', 'write_mode', size=(6, 1),
                         key = '_write_append_', default=True), 
-               sg.Radio('overwrite', 'write_mode', size=(6, 1),
+                 sg.Radio('overwrite', 'write_mode', size=(6, 1),
                         key = '_write_overwrite_')],
-              
-            [sg.Frame(layout=[                 
+                        
                 [sg.Text('Append move as', size = (12, 1)),
                  sg.Radio('bm', 'first_color', size=(6, 1), key = '_bm_',), 
                  sg.Radio('sm', 'first_color', size=(6, 1), key = '_sm_'),
                  sg.Radio('pm', 'first_color', size=(6, 1), key = '_pm_'),
                  sg.Radio('am', 'first_color', size=(6, 1), key = '_am_'),
-                 sg.Radio('am if move[?, ??]', 'first_color', size=(13, 1), key = '_am_bad_'),
                  sg.Radio('Never', 'first_color', size=(6, 1), 
                           key = '_never_move_', default=True)],
+                          
+                [sg.Text("NAG's", size = (12, 1), 
+                    tooltip = 'NAG (Numeric Annotation Glyphs)\n1. Append am if move has ? or ??.\n2. Append bm if move has ! or !!.'),
+                 sg.CBox('am ?, ??', key = '_am_bad_move_', size = (6, 1), default=False), 
+                 sg.CBox('bm !, !!', key = '_bm_good_move_', default=False)],
                  
                 [sg.Text('Append id from', size = (12, 1),
                          tooltip='Append id from Game header tags.'),
@@ -379,7 +389,6 @@ def main():
             is_sm_append_move = value['_sm_']
             is_pm_append_move = value['_pm_']
             is_am_append_move = value['_am_']
-            is_am_bad_append_move = value['_am_bad_']
             
             if is_bm_append_move:
                 append_move_type = 'bm'
@@ -389,10 +398,13 @@ def main():
                 append_move_type = 'pm'
             elif is_am_append_move:
                 append_move_type = 'am'
-            elif is_am_bad_append_move:
-                append_move_type = 'am_bad'
             else:
                 append_move_type = 'never'
+                
+            # Option reated to NAGS that is, !, !!, ? and ??
+            # Element type: check box
+            is_bad_move_am = value['_am_bad_move_']
+            is_good_move_bm = value['_bm_good_move_']
             
             # Radio
             is_white_append_id = value['_white_id_']
@@ -450,7 +462,8 @@ def main():
             window.FindElement('_status_').Update('Status: processing ...')            
             pgntoepd = pgn_to_epd(gui_queue, pgnfn, save_epdfn, append_move_type,
                     append_tag, is_remove_duplicate, color_to_move, min_move_number, 
-                    max_move_number, is_write_append, is_first_move)
+                    max_move_number, is_write_append, is_first_move, is_bad_move_am,
+                    is_good_move_bm)
             pgntoepd.setDaemon(True)
             pgntoepd.start()
             while True:
