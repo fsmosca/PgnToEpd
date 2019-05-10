@@ -407,7 +407,8 @@ def main():
             # Radio, write mode
             is_write_append = value['_write_append_']
             
-            # Radio
+            # bm, sm, pm, am opcode options
+            # Elepment type: Radio
             is_bm_append_move = value['_bm_']
             is_sm_append_move = value['_sm_']
             is_pm_append_move = value['_pm_']
@@ -424,12 +425,13 @@ def main():
             else:
                 append_move_type = 'never'
                 
-            # Option reated to NAGS that is, !, !!, ? and ??
+            # NAG's options, use am if move has ? or ??, and use bm if move has ! or !!.
             # Element type: check box
             is_bad_move_am = value['_am_bad_move_']
             is_good_move_bm = value['_bm_good_move_']
             
-            # Radio
+            # id opcode option
+            # Element type: Radio
             is_white_append_id = value['_white_id_']
             is_black_append_id = value['_black_id_']
             is_event_append_id = value['_event_id_']
@@ -446,7 +448,8 @@ def main():
             # Radio
             is_remove_duplicate = value['_remove_duplicate_']
             
-            # Checkbox
+            # Side to move options
+            # Elepment type: Checkbox
             is_white_to_move = value['_white_side_to_move_']
             is_black_to_move = value['_black_side_to_move_']
             
@@ -459,13 +462,15 @@ def main():
             else:
                 color_to_move = None                
             
-            # Move number filter
+            # Move no. options
             min_move_number = int(value['_min_move_number_'])
             max_move_number = int(value['_max_move_number_']) 
 
             min_move_number = int(value['_min_move_number_'])
             max_move_number = int(value['_max_move_number_'])
             
+            # First move only option.
+            # Elepment type: Checkbox
             is_first_move = True if value['_first_move_'] else False
             
             t1 = time.time()
@@ -513,7 +518,7 @@ def main():
                 while True:
                     button, value = window.Read(timeout=0)
                     window.FindElement('_epd_file_').Update(epd_path)
-                    print(epd_path)
+                    logging.info('epd file: {}'.format(epd_path))
                     break
             except:
                 continue            
