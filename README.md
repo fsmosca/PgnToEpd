@@ -1,7 +1,7 @@
 # PgnToEpd
 A program written in python that converts positions in the games to EPD format. There are options which the user can set such as side to move, move numbers and others.
 
-![](https://i.imgur.com/xgjPSz8.png)
+![](https://i.imgur.com/Wj0Ing8.png)
 
 ### A. Requirements
 #### 1. If you use the source pgntoepd.py
