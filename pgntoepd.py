@@ -20,7 +20,7 @@ logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.13.beta'
+APP_VERSION = 'v0.1.14.beta'
 BOX_TITLE = APP_NAME + ' ' + APP_VERSION
 
 
@@ -159,9 +159,9 @@ class pgn_to_epd(threading.Thread):
                         move_append = 'bm'
                     else:
                         move_append = self.append_move
-                        
-                    # Ignore min and max move no. options when "First move only" option is true.
-                    if not self.is_first_move:             
+
+                    # Only enable min and max move no. options if "First move only" is false
+                    if not self.is_first_move:
                         # Move number filter
                         if fmvn > self.max_move_number:
                             logging.info('fmvn {} is more than max move number {}, break'.format(fmvn,
@@ -172,17 +172,19 @@ class pgn_to_epd(threading.Thread):
                             game_node = next_node
                             logging.info('fmvn {} is less than min move number {}, continue'.format(fmvn,
                                          self.min_move_number))
-                            continue                     
-                    
-                    # Side to move filter
-                    if self.side_to_move == 'w' and not side:
-                        game_node = next_node                        
-                        logging.info('side to save is white, but side to move is black, skip')
-                        continue
-                    elif self.side_to_move == 'b' and side:
-                        game_node = next_node
-                        logging.info('side to save is black, but side to move is white, skip')
-                        continue 
+                            continue
+                        
+                    # Only enable side to move option if "First move only" is false
+                    if not self.is_first_move:                    
+                        # Side to move filter
+                        if self.side_to_move == 'w' and not side:
+                            game_node = next_node                        
+                            logging.info('side to save is white, but side to move is black, skip')
+                            continue
+                        elif self.side_to_move == 'b' and side:
+                            game_node = next_node
+                            logging.info('side to save is black, but side to move is white, skip')
+                            continue 
                     
                     epd_id ='my_id'
                     if self.append_id == 'w':
@@ -284,7 +286,16 @@ class pgn_to_epd(threading.Thread):
 def main():
     gui_queue = queue.Queue()
     sg.ChangeLookAndFeel('Reddit')
+    
+    menu_def = [
+            ['File', ['Exit']],            
+            ['Tools', ['Clean PGN']],
+            ['&Help', ['PGN', 'EPD', 'OPTIONS']],
+    ]
+    
     layout = [
+            [sg.Menu(menu_def, tearoff=False)],
+            
             [sg.Text('Input PGN', size = (10, 1)), 
                sg.InputText('', size = (57, 1), key = '_txt_pgn_'),
                sg.FileBrowse('Get PGN', key = '_get_pgn_',
@@ -374,8 +385,20 @@ def main():
         button, value = window.Read(timeout=10)
         
         if button is None or button == 'Exit':
-            logging.info('x is pressed')
+            logging.info('Exit app')
             break
+        
+        if button == 'PGN':
+            sg.PopupOK('For update', title = BOX_TITLE)
+            
+        if button == 'EPD':
+            sg.PopupOK('For update', title = BOX_TITLE)
+            
+        if button == 'Clean PGN':
+            sg.PopupOK('For update', title = BOX_TITLE)
+            
+        if button == 'OPTIONS':
+            sg.PopupOK('For update', title = BOX_TITLE)
         
         if button == '_pgn_to_epd_':
             save_epdfn = value['_epd_file_']
@@ -469,8 +492,8 @@ def main():
             while True:
                 button, value = window.Read(timeout=1000)
                 
-                if button is None:
-                    logging.info('x is pressed')
+                if button is None or button == 'Exit':
+                    logging.info('Exit app')
                     sys.exit()
                     
                 msg = gui_queue.get()
