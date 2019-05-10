@@ -389,16 +389,16 @@ def main():
             break
         
         if button == 'PGN':
-            sg.PopupOK('For update', title = BOX_TITLE)
+            sg.PopupOK('For update', title = BOX_TITLE, keep_on_top = True)
             
         if button == 'EPD':
-            sg.PopupOK('For update', title = BOX_TITLE)
+            sg.PopupOK('For update', title = BOX_TITLE, keep_on_top = True)
             
         if button == 'Clean PGN':
-            sg.PopupOK('For update', title = BOX_TITLE)
+            sg.PopupOK('For update', title = BOX_TITLE, keep_on_top = True)
             
         if button == 'OPTIONS':
-            sg.PopupOK('For update', title = BOX_TITLE)
+            sg.PopupOK('For update', title = BOX_TITLE, keep_on_top = True)
         
         if button == '_pgn_to_epd_':
             save_epdfn = value['_epd_file_']
