@@ -15,12 +15,12 @@ import chess.pgn
 import logging
 
 
-logging.basicConfig(filename='pecg.log', filemode='w', level=logging.DEBUG,
+logging.basicConfig(filename='pgntoepd_log.txt', filemode='w', level=logging.DEBUG,
                     format='%(asctime)s :: %(levelname)s :: %(message)s')
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.1.14.beta'
+APP_VERSION = 'v0.2'
 BOX_TITLE = APP_NAME + ' ' + APP_VERSION
 
 
@@ -30,18 +30,20 @@ def delete_file(fn):
         os.remove(fn)
 
 
-class pgn_to_epd(threading.Thread):
+class GameToEpd(threading.Thread):
     def __init__(self, pgntoepd_queue, pgnfn, output_epdfn, append_move,
-                 append_id, remove_duplicate, side_to_move, min_move_number,
-                 max_move_number, write_append, is_first_move, is_bad_move_am,
-                 is_good_move_bm):
+                 is_white_id, is_black_id, is_event_id, remove_duplicate,
+                 side_to_move, min_move_number, max_move_number, write_append,
+                 is_first_move, is_bad_move_am, is_good_move_bm):
         threading.Thread.__init__(self)
         self.pgntoepd_queue = pgntoepd_queue
         self.pgnfn = pgnfn
         self.append_move = append_move
         self.is_bad_move_am = is_bad_move_am
         self.is_good_move_bm = is_good_move_bm
-        self.append_id = append_id
+        self.is_white_id = is_white_id
+        self.is_black_id = is_black_id
+        self.is_event_id = is_event_id
         self.remove_duplicate = remove_duplicate
         self.side_to_move = side_to_move
         self.min_move_number = min_move_number
@@ -123,6 +125,24 @@ class pgn_to_epd(threading.Thread):
                 black_tag = game.headers['Black']
                 event_tag = game.headers['Event']
                 
+                is_add_id = True
+                if not self.is_white_id and not self.is_black_id and not self.is_event_id:
+                    is_add_id = False
+                elif self.is_white_id and self.is_black_id and self.is_event_id:
+                    epd_id = '{}_{}_{}'.format(white_tag, black_tag, event_tag)
+                elif self.is_white_id and self.is_black_id:
+                    epd_id = '{}_{}'.format(white_tag, black_tag)
+                elif self.is_white_id and self.is_event_id:
+                    epd_id = '{}_{}'.format(white_tag, event_tag)
+                elif self.is_black_id and self.is_event_id:
+                    epd_id = '{}_{}'.format(black_tag, event_tag)
+                elif self.is_white_id:
+                    epd_id = '{}'.format(white_tag)
+                elif self.is_black_id:
+                    epd_id = '{}'.format(black_tag)
+                elif self.is_event_id:
+                    epd_id = '{}'.format(event_tag)
+
                 game_node = game
                 self.num_processed_games += 1
                 self.pgntoepd_queue.put('processing game {} of {} or ({:0.1f}%)'.format(self.num_processed_games, 
@@ -184,22 +204,14 @@ class pgn_to_epd(threading.Thread):
                         elif self.side_to_move == 'b' and side:
                             game_node = next_node
                             logging.info('side to save is black, but side to move is white, skip')
-                            continue 
-                    
-                    epd_id ='my_id'
-                    if self.append_id == 'w':
-                        epd_id = white_tag
-                    elif self.append_id == 'b':
-                        epd_id = black_tag
-                    elif self.append_id == 'e':
-                        epd_id = event_tag                        
+                            continue                     
 
                     with open(self.output_epdfn, mode = 'a+', encoding = self.file_encoding) as f:
                         # Writing hmvc or fifty-move number is not part of the options.
                         # But with high hmvc we record this number as it may affect
                         # the evaluation of the position.
                         if hmvc >= 80:
-                            if self.append_id == 'never':
+                            if not is_add_id:
                                 if move_append == 'never':
                                     unique_epd = epd
                                     if self.remove_duplicate:
@@ -239,7 +251,7 @@ class pgn_to_epd(threading.Thread):
                                                 move_append, san_move, hmvc, epd_id))
                         # Else if hmvc is below 80
                         else:
-                            if self.append_id == 'never':
+                            if not is_add_id:
                                 if move_append == 'never':
                                     unique_epd = '{}'.format(epd)
                                     if self.remove_duplicate:
@@ -328,10 +340,9 @@ def main():
                  
                 [sg.Text('Append id from', size = (12, 1),
                          tooltip='Append id from Game header tags.'),
-                 sg.Radio('White', 'epd_id', size=(6, 1), key = '_white_id_',), 
-                 sg.Radio('Black', 'epd_id', size=(6, 1), key = '_black_id_'),
-                 sg.Radio('Event', 'epd_id', size=(6, 1), key = '_event_id_'),
-                 sg.Radio('Never', 'epd_id', size=(6, 1), key = '_never_id_', default=True)],
+                 sg.CBox('White', size=(6, 1), key = '_white_id_', default=False), 
+                 sg.CBox('Black', size=(6, 1), key = '_black_id_', default=False),
+                 sg.CBox('Event', size=(6, 1), key = '_event_id_', default=True)],
                  
                 [sg.Text('EPD duplicates', size = (12, 1)),
                  sg.Radio('Remove', 'duplicate', size=(6, 1),
@@ -360,15 +371,15 @@ def main():
                  
                 [sg.Text('Window CP1', size = (12, 1)),
                  sg.Text('Minimum', size = (8, 1)),
-                 sg.InputText('-50', size = (6, 1), key = '_cp_min_'), 
+                 sg.InputText('-50', size = (6, 1), key = '_cp_min_1'), 
                  sg.Text('Maximum', size = (8, 1)),
-                 sg.InputText('-25', size = (6, 1), key = '_cp_max_')],
+                 sg.InputText('-25', size = (6, 1), key = '_cp_max_1')],
                  
                 [sg.Text('Window CP2', size = (12, 1)),
                  sg.Text('Minimum', size = (8, 1)),
-                 sg.InputText('25', size = (6, 1), key = '_cp_min_'), 
+                 sg.InputText('25', size = (6, 1), key = '_cp_min_2'), 
                  sg.Text('Maximum', size = (8, 1)),
-                 sg.InputText('50', size = (6, 1), key = '_cp_max_')],
+                 sg.InputText('50', size = (6, 1), key = '_cp_max_2')],
                 ], title='Analysis', title_color='blue', visible=False)
             ],
             
@@ -431,19 +442,10 @@ def main():
             is_good_move_bm = value['_bm_good_move_']
             
             # id opcode option
-            # Element type: Radio
+            # Element type: CheckBox
             is_white_append_id = value['_white_id_']
             is_black_append_id = value['_black_id_']
             is_event_append_id = value['_event_id_']
-            
-            if is_white_append_id:
-                append_tag = 'w'
-            elif is_black_append_id:
-                append_tag = 'b'
-            elif is_event_append_id:
-                append_tag = 'e'
-            else:
-                append_tag = 'never'
             
             # Radio
             is_remove_duplicate = value['_remove_duplicate_']
@@ -488,8 +490,9 @@ def main():
                 continue
             
             window.FindElement('_status_').Update('Status: processing ...')            
-            pgntoepd = pgn_to_epd(gui_queue, pgnfn, save_epdfn, append_move_type,
-                    append_tag, is_remove_duplicate, color_to_move, min_move_number, 
+            pgntoepd = GameToEpd(gui_queue, pgnfn, save_epdfn, append_move_type,
+                    is_white_append_id, is_black_append_id, is_event_append_id,
+                    is_remove_duplicate, color_to_move, min_move_number, 
                     max_move_number, is_write_append, is_first_move, is_bad_move_am,
                     is_good_move_bm)
             pgntoepd.setDaemon(True)
