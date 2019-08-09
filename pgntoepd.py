@@ -16,11 +16,11 @@ import logging
 
 
 logging.basicConfig(filename='pgntoepd_log.txt', filemode='w', level=logging.DEBUG,
-                    format='%(asctime)s :: %(levelname)s :: %(message)s')
+                    format='%(asctime)s :: %(funcName)s :: line %(lineno)d :: %(levelname)s :: %(message)s')
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.2'
+APP_VERSION = 'v0.3'
 BOX_TITLE = APP_NAME + ' ' + APP_VERSION
 
 
@@ -54,52 +54,24 @@ class GameToEpd(threading.Thread):
         self.move_sequence = 0
         self.num_processed_games = 0
         self.tmp_save = []
-        self.file_encoding = None
+        self.file_encoding = 'utf-8-sig'
         self.num_games = self.get_num_games()
 
     def get_num_games(self):
         """
-        This method is called the moment class pgn_to_epd is used.
-        This method also changes the encoding from None to utf-8, if None
-        will not work. If utf-8 also will not work, we will quit the program
-        and log some warning messages.
+        Returns number of games thru number of Result tags.
         """
         num_games = 0
-        
-        try:
-            with open(self.pgnfn, mode = 'r', encoding = self.file_encoding) as f:
-                for lines in f:
-                    if '[Result ' in lines:
-                        num_games += 1
-        except Exception as ex:
-            template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
-            message = template.format(type(ex).__name__, ex.args)
-            logging.warning(message)
-            
-            # Change encoding and try again
-            if self.file_encoding is None:
-                self.file_encoding = 'utf-8'
-            else:
-                self.file_encoding = None
-                
-            logging.info('Try using encoding: {}'.format(self.file_encoding))
-            
-            try:
-                with open(self.pgnfn, mode = 'r', encoding = self.file_encoding) as f:
-                    for lines in f:
-                        if '[Result ' in lines:
-                            num_games += 1
-            except Exception as ex:
-                template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
-                message = template.format(type(ex).__name__, ex.args)
-                logging.warning(message)
-                sys.exit(1)
+        with open(self.pgnfn, mode='r', encoding=self.file_encoding) as f:
+            for lines in f:
+                if '[Result ' in lines:
+                    num_games += 1
                     
         return num_games
     
     def get_existing_epd(self):
         if os.path.isfile(self.output_epdfn):
-            with open(self.output_epdfn, mode = 'r', encoding = self.file_encoding) as f:
+            with open(self.output_epdfn, mode='r', encoding=self.file_encoding) as f:
                 for lines in f:
                     line = lines.strip()
                     self.tmp_save.append(line)
@@ -114,7 +86,7 @@ class GameToEpd(threading.Thread):
             self.get_existing_epd()
             
         # Process PGN file
-        with open(self.pgnfn, mode = 'r', encoding = self.file_encoding) as h:
+        with open(self.pgnfn, mode='r', encoding=self.file_encoding) as h:
             game = chess.pgn.read_game(h)
             self.num_processed_games = 0
     
@@ -206,7 +178,7 @@ class GameToEpd(threading.Thread):
                             logging.info('side to save is black, but side to move is white, skip')
                             continue                     
 
-                    with open(self.output_epdfn, mode = 'a+', encoding = self.file_encoding) as f:
+                    with open(self.output_epdfn, mode='a+') as f:
                         # Writing hmvc or fifty-move number is not part of the options.
                         # But with high hmvc we record this number as it may affect
                         # the evaluation of the position.
@@ -393,7 +365,7 @@ def main():
                        icon='')
 
     while True:
-        button, value = window.Read(timeout=10)
+        button, value = window.Read(timeout=100)
         
         if button is None or button == 'Exit':
             logging.info('Exit app')
