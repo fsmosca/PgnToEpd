@@ -20,7 +20,7 @@ logging.basicConfig(filename='pgntoepd_log.txt', filemode='w', level=logging.DEB
 
 
 APP_NAME = 'PGN to EPD'
-APP_VERSION = 'v0.3'
+APP_VERSION = 'v0.4'
 BOX_TITLE = APP_NAME + ' ' + APP_VERSION
 
 
@@ -34,7 +34,7 @@ class GameToEpd(threading.Thread):
     def __init__(self, pgntoepd_queue, pgnfn, output_epdfn, append_move,
                  is_white_id, is_black_id, is_event_id, remove_duplicate,
                  side_to_move, min_move_number, max_move_number, write_append,
-                 is_first_move, is_bad_move_am, is_good_move_bm):
+                 is_first_move, is_bad_move_am, is_good_move_bm, is_include_var=True):
         threading.Thread.__init__(self)
         self.pgntoepd_queue = pgntoepd_queue
         self.pgnfn = pgnfn
@@ -51,11 +51,13 @@ class GameToEpd(threading.Thread):
         self.output_epdfn = output_epdfn
         self.write_append = write_append
         self.is_first_move = is_first_move
+        self.is_include_var = is_include_var
         self.move_sequence = 0
         self.num_processed_games = 0
         self.tmp_save = []
         self.file_encoding = 'utf-8-sig'
         self.num_games = self.get_num_games()
+        self.num_saved = 0
 
     def get_num_games(self):
         """
@@ -126,12 +128,39 @@ class GameToEpd(threading.Thread):
                     epd = game_node.board().epd()
                     
                     fmvn = game_node.board().fullmove_number
-                    hmvc = game_node.board().halfmove_clock
+                    hmvc = game_node.board().halfmove_clock                   
                     
                     next_node = game_node.variation(0)
                     san_move = next_node.san()
                     nags = next_node.nags
+                    is_variation = False
+                    var_move_append = None
                     
+                    # Check if there is variation to the main line move
+                    if self.is_include_var:
+                        try:
+                            var_node_1 = game_node.variation(1)
+                            
+                            # If this is the first node of a variation
+                            if var_node_1.starts_variation():
+                                var_san_move = var_node_1.san()
+                                var_node_1_nags = var_node_1.nags
+                                
+                                # Append am if first move of variation has ? or ?? move comment
+                                if chess.pgn.NAG_MISTAKE in var_node_1_nags or chess.pgn.NAG_BLUNDER in var_node_1_nags:
+                                    var_move_append = 'am'
+                                    is_variation = True
+                                    
+                                # Append bm if first move of variation has ! or !! move comment
+                                elif chess.pgn.NAG_GOOD_MOVE in var_node_1_nags or chess.pgn.NAG_BRILLIANT_MOVE in var_node_1_nags:
+                                    var_move_append = 'bm'
+                                    is_variation = True
+                                # Else if other comments or no comment use bm. To be improved later.
+                                else:
+                                    is_variation = True
+                        except:
+                            logging.info('There is no variation of main line move: {}'.format(san_move))
+                        
                     # Count of read moves for every game. This is useful for
                     # "First move only" option
                     self.move_sequence += 1
@@ -151,6 +180,15 @@ class GameToEpd(threading.Thread):
                         move_append = 'bm'
                     else:
                         move_append = self.append_move
+                        
+                    # If var_append is not bm or am, then set it to main append type
+                    if is_variation and (move_append == 'bm' or move_append == 'am'):
+                        if var_move_append is None:
+                            var_move_append = move_append
+                    # Else if main append is not bm or am
+                    elif is_variation:
+                        if var_move_append is None:
+                            is_variation = False
 
                     # Only enable min and max move no. options if "First move only" is false
                     if not self.is_first_move:
@@ -176,89 +214,80 @@ class GameToEpd(threading.Thread):
                         elif self.side_to_move == 'b' and side:
                             game_node = next_node
                             logging.info('side to save is black, but side to move is white, skip')
-                            continue                     
-
+                            continue
+                        
+                    # Write to epd output
                     with open(self.output_epdfn, mode='a+') as f:
-                        # Writing hmvc or fifty-move number is not part of the options.
-                        # But with high hmvc we record this number as it may affect
-                        # the evaluation of the position.
-                        if hmvc >= 80:
-                            if not is_add_id:
-                                if move_append == 'never':
-                                    unique_epd = epd
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{} hmvc {};\n'.format(epd, hmvc))
-                                            self.tmp_save.append(unique_epd)
-                                    else:
-                                        f.write('{} hmvc {};\n'.format(epd, hmvc))
+                        # If epd id is not set
+                        if not is_add_id:
+                            if move_append == 'never':
+                                save_epd = '{} hmvc {};'.format(epd, hmvc)
+
+                                if self.remove_duplicate:
+                                    if not epd in self.tmp_save:
+                                        f.write('{}\n'.format(save_epd))
+                                        self.tmp_save.append(epd)
+                                        self.num_saved += 1
                                 else:
-                                    unique_epd = '{} {} {};'.format(epd, move_append, san_move)
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{} {} {}; hmvc {};\n'.format(epd,
-                                                    move_append, san_move, hmvc))
-                                            self.tmp_save.append(unique_epd)
-                                    else:
-                                        f.write('{} {} {}; hmvc {};\n'.format(epd,
-                                                move_append, san_move, hmvc))
+                                    f.write('{}\n'.format(save_epd))
+                                    self.num_saved += 1
                             else:
-                                if move_append == 'never':
-                                    unique_epd = '{}'.format(epd)
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{} hmvc {}; id \"{}\";\n'.format(epd, hmvc, epd_id))
-                                            self.tmp_save.append(unique_epd)
-                                        else:
-                                            f.write('{} hmvc {}; id \"{}\";\n'.format(epd, hmvc, epd_id))
-                                else:
-                                    unique_epd = '{} {} {};'.format(epd, move_append, san_move)
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{} {} {}; hmvc {}; id \"{}\";\n'.format(epd, 
-                                                    move_append, san_move, hmvc, epd_id))
-                                            self.tmp_save.append(unique_epd)
+                                # If variation is included
+                                if self.is_include_var and is_variation:
+                                    if (move_append == 'bm' and var_move_append == 'bm') or \
+                                            (move_append == 'am' and var_move_append == 'am'):
+                                        save_epd = '{} {} {} {}; hmvc {};'.format(
+                                                epd, move_append, san_move, var_san_move, hmvc)
                                     else:
-                                        f.write('{} {} {}; hmvc {}; id \"{}\";\n'.format(epd,
-                                                move_append, san_move, hmvc, epd_id))
-                        # Else if hmvc is below 80
+                                        save_epd = '{} {} {}; {} {}; hmvc {};'.format(
+                                                epd, move_append, san_move, var_move_append, var_san_move, hmvc)
+                                else:
+                                    save_epd = '{} {} {}; hmvc {};'.format(epd, move_append, san_move, hmvc)
+                                    
+                                if self.remove_duplicate:
+                                    if not epd in self.tmp_save:
+                                        f.write('{};\n'.format(save_epd))
+                                        self.tmp_save.append(epd)
+                                        self.num_saved += 1
+                                else:
+                                    f.write('{};\n'.format(save_epd))
+                                    self.num_saved += 1
+                        # Else if epd id is set
                         else:
-                            if not is_add_id:
-                                if move_append == 'never':
-                                    unique_epd = '{}'.format(epd)
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{}\n'.format(epd))
-                                            self.tmp_save.append(unique_epd)
-                                    else:
-                                        f.write('{}\n'.format(epd))
+                            if move_append == 'never':
+                                save_epd = '{} hmvc {}; id \"{}, {}\";'.format(epd, hmvc, epd_id, self.num_saved+1)
+
+                                if self.remove_duplicate:
+                                    if not epd in self.tmp_save:
+                                        f.write('{}\n'.format(save_epd))
+                                        self.tmp_save.append(epd)
+                                        self.num_saved += 1
                                 else:
-                                    unique_epd = '{} {} {};'.format(epd, move_append, san_move)
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{} {} {};\n'.format(epd, move_append, san_move))
-                                            self.tmp_save.append(unique_epd)
-                                    else:
-                                        f.write('{} {} {};\n'.format(epd, move_append, san_move))
+                                    f.write('{}\n'.format(save_epd))
+                                    self.num_saved += 1
                             else:
-                                if move_append == 'never':
-                                    unique_epd = '{}'.format(epd)
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{} id \"{}\";\n'.format(epd, epd_id))
-                                            self.tmp_save.append(unique_epd)
+                                # If variation is included
+                                if self.is_include_var and is_variation:
+                                    if (move_append == 'bm' and var_move_append == 'bm') or \
+                                            (move_append == 'am' and var_move_append == 'am'):
+                                        save_epd = '{} {} {} {}; hmvc {}; id \"{}, {}\";'.format(
+                                                epd, move_append, san_move, var_san_move, hmvc, epd_id, self.num_saved+1)
                                     else:
-                                        f.write('{} id \"{}\";\n'.format(epd, epd_id))
+                                        save_epd = '{} {} {}; {} {}; hmvc {}; id \"{}, {}\";'.format(
+                                                epd, move_append, san_move,
+                                                var_move_append, var_san_move, hmvc, epd_id, self.num_saved+1)
                                 else:
-                                    unique_epd = '{} {} {};'.format(epd, move_append, san_move)
-                                    if self.remove_duplicate:
-                                        if not unique_epd in self.tmp_save:
-                                            f.write('{} {} {}; id \"{}\";\n'.format(epd,
-                                                    move_append, san_move, epd_id))
-                                            self.tmp_save.append(unique_epd)
-                                    else:
-                                        f.write('{} {} {}; id \"{}\";\n'.format(epd,
-                                                move_append, san_move, epd_id))
+                                    save_epd = '{} {} {}; hmvc {}; id \"{}, {}\";'.format(
+                                            epd, move_append, san_move, hmvc, epd_id, self.num_saved+1)
+                                    
+                                if self.remove_duplicate:
+                                    if not epd in self.tmp_save:
+                                        f.write('{}\n'.format(save_epd))
+                                        self.tmp_save.append(epd)
+                                        self.num_saved += 1
+                                else:
+                                    f.write('{}\n'.format(save_epd))
+                                    self.num_saved += 1
 
                     game_node = next_node
         
