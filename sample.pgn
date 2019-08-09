@@ -1,0 +1,11 @@
+[Event "Sample game 1"]
+[Site "?"]
+[Date "????.??.??"]
+[Round "?"]
+[White "wplayer"]
+[Black "bplayer"]
+[Result "*"]
+[ECO "C57"]
+
+1.e4 ( 1.Nh3 $2 ) 1...e5 2.Nf3 Nc6 $1 ( 2...f6 $2 ) 3.Bc4 Nf6 4.Ng5 d5 $1 *
+
