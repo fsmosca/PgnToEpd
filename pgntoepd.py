@@ -155,7 +155,7 @@ class GameToEpd(threading.Thread):
                                 elif chess.pgn.NAG_GOOD_MOVE in var_node_1_nags or chess.pgn.NAG_BRILLIANT_MOVE in var_node_1_nags:
                                     var_move_append = 'bm'
                                     is_variation = True
-                                # Else if other comments or no comment use bm. To be improved later.
+                                # Else if other comments or no comment use the move_append of main line.
                                 else:
                                     is_variation = True
                         except:
@@ -181,11 +181,11 @@ class GameToEpd(threading.Thread):
                     else:
                         move_append = self.append_move
                         
-                    # If var_append is not bm or am, then set it to main append type
+                    # If var_append is not bm or am, then set it to main append type if it is bm or am
                     if is_variation and (move_append == 'bm' or move_append == 'am'):
                         if var_move_append is None:
                             var_move_append = move_append
-                    # Else if main append is not bm or am
+                    # Else if main append is not bm or am then do not include the variation move.
                     elif is_variation:
                         if var_move_append is None:
                             is_variation = False
