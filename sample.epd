@@ -1,0 +1,8 @@
+rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - bm e4; am Nh3; hmvc 0; id "Sample game 1, 1";
+rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - bm e5; hmvc 0; id "Sample game 1, 2";
+rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - bm Nf3; hmvc 0; id "Sample game 1, 3";
+rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - bm Nc6; am f6; hmvc 1; id "Sample game 1, 4";
+r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - bm Bc4; hmvc 2; id "Sample game 1, 5";
+r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - bm Nf6; hmvc 3; id "Sample game 1, 6";
+r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - bm Ng5; hmvc 4; id "Sample game 1, 7";
+r1bqkb1r/pppp1ppp/2n2n2/4p1N1/2B1P3/8/PPPP1PPP/RNBQK2R b KQkq - bm d5; hmvc 5; id "Sample game 1, 8";
