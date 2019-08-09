@@ -159,7 +159,7 @@ class GameToEpd(threading.Thread):
                                 else:
                                     is_variation = True
                         except:
-                            logging.info('There is no variation of main line move: {}'.format(san_move))
+                            pass
                         
                     # Count of read moves for every game. This is useful for
                     # "First move only" option
